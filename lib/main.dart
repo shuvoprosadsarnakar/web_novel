@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:web_novel/novel_reader.dart';
+
+import 'novel_reader.dart';
 
 void main() {
   runApp(const MyApp());

@@ -2,120 +2,141 @@ import 'package:flutter/material.dart';
 
 class NovelReader extends StatefulWidget {
   @override
-  _NovelReaderState createState() => _NovelReaderState();
+  State<NovelReader> createState() => _NovelReaderState();
 }
 
 class _NovelReaderState extends State<NovelReader> {
+  final PageController _pageController = PageController();
+  final Map<int, String> _chapterData = {};
+  int _currentChapter = 0;
   final ScrollController _scrollController = ScrollController();
-  int _currentChapter = 1;
-  Map<int, String> _chapterData = {};
-  bool _slideUp = true; // direction controller
+  bool _isScrolling = false;
 
   @override
   void initState() {
     super.initState();
-    _loadChapter(_currentChapter);
+    _loadChapters();
+    _scrollController.addListener(_handleScroll);
   }
 
-  void _loadChapter(int chapter) async {
-    if (_chapterData.containsKey(chapter)) return;
-
-    await Future.delayed(Duration(milliseconds: 300));
-    _chapterData[chapter] =
-        "Chapter $chapter\n\n" +
-        List.generate(
-          50,
-          (i) => "Line ${i + 1} of Chapter $chapter",
-        ).join("\n\n");
-
+  void _loadChapters() {
+    for (int i = 0; i < 10; i++) {
+      _chapterData[i] =
+          "Chapter ${i + 1}\n\n" +
+          List.generate(
+            50,
+            (j) => "Line ${j + 1} of Chapter ${i + 1}",
+          ).join("\n\n");
+    }
     setState(() {});
-    _scrollController.jumpTo(0); // Reset scroll
   }
 
   void _goToNextChapter() {
-    setState(() {
-      _slideUp = true;
-      _currentChapter++;
-      _loadChapter(_currentChapter);
-    });
-  }
-
-  void _goToPreviousChapter() {
-    if (_currentChapter > 1) {
-      setState(() {
-        _slideUp = false;
-        _currentChapter--;
-        _loadChapter(_currentChapter);
+    if (_currentChapter < _chapterData.length - 1) {
+      _pageController.nextPage(
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      // Reset scroll position for the new chapter
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollController.jumpTo(0);
       });
     }
   }
 
+  void _goToPreviousChapter() {
+    if (_currentChapter > 0) {
+      _pageController.previousPage(
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      // Reset scroll position for the new chapter
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollController.jumpTo(0);
+      });
+    }
+  }
+
+  void _handleScroll() {
+    final metrics = _scrollController.position;
+    // Check if scrolled beyond 30 pixels from bottom
+    if (metrics.pixels > metrics.maxScrollExtent + 30 &&
+        _currentChapter < _chapterData.length - 1 &&
+        !_isScrolling) {
+      _isScrolling = true;
+      _goToNextChapter();
+      Future.delayed(Duration(milliseconds: 500), () => _isScrolling = false);
+    }
+    // Check if scrolled beyond 30 pixels from top
+    else if (metrics.pixels < -30 && _currentChapter > 0 && !_isScrolling) {
+      _isScrolling = true;
+      _goToPreviousChapter();
+      Future.delayed(Duration(milliseconds: 500), () => _isScrolling = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final content = _chapterData[_currentChapter];
-
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            content == null
-                ? Center(child: CircularProgressIndicator())
-                : AnimatedSwitcher(
-                    duration: Duration(milliseconds: 500),
-                    transitionBuilder: (child, animation) {
-                      final offsetAnimation = Tween<Offset>(
-                        begin: _slideUp ? Offset(0, 1) : Offset(0, -1),
-                        end: Offset.zero,
-                      ).animate(animation);
-                      return SlideTransition(
-                        position: offsetAnimation,
-                        child: child,
-                      );
-                    },
-                    child: Container(
-                      key: ValueKey<int>(_currentChapter),
-                      child: Scrollbar(
-                        child: ListView(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 24,
-                          ),
-                          children: [
-                            if (_currentChapter > 1)
-                              Container(
-                                alignment: Alignment.center,
-                                height: 200,
-                                color: Colors.white38,
-                                child: FloatingActionButton(
-                                  heroTag: 'prev',
-                                  onPressed: _goToPreviousChapter,
-                                  child: Icon(Icons.arrow_upward),
-                                ),
-                              ),
-                            Text(
-                              content,
-                              style: TextStyle(fontSize: 18, height: 1.6),
-                            ),
-                            Container(
-                              alignment: Alignment.center,
-                              height: 200,
-                              color: Colors.white38,
+      body: _chapterData.isEmpty
+          ? Center(child: CircularProgressIndicator())
+          : PageView.builder(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              onPageChanged: (index) => setState(() => _currentChapter = index),
+              itemCount: _chapterData.length,
+              itemBuilder: (_, index) {
+                return SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 24,
+                    ),
+                    child: ListView(
+                      controller: _scrollController,
+                      physics: ClampingScrollPhysics(),
+                      children: [
+                        if (index > 0)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
                               child: FloatingActionButton(
-                                heroTag: 'next',
-                                onPressed: _goToNextChapter,
-                                child: Icon(Icons.arrow_downward),
+                                heroTag: 'prev_$index',
+                                mini: true,
+                                onPressed: _goToPreviousChapter,
+                                child: Icon(Icons.arrow_upward),
                               ),
                             ),
-                          ],
+                          ),
+                        Text(
+                          _chapterData[index]!,
+                          style: TextStyle(fontSize: 18, height: 1.6),
                         ),
-                      ),
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: FloatingActionButton(
+                              heroTag: 'next_$index',
+                              mini: true,
+                              onPressed: _goToNextChapter,
+                              child: Icon(Icons.arrow_downward),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 30), // Extra space for overscroll
+                      ],
                     ),
                   ),
-          ],
-        ),
-      ),
+                );
+              },
+            ),
     );
   }
 }
