@@ -9,6 +9,7 @@ class _NovelReaderState extends State<NovelReader> {
   final ScrollController _scrollController = ScrollController();
   int _currentChapter = 1;
   Map<int, String> _chapterData = {};
+  bool _slideUp = true; // direction controller
 
   @override
   void initState() {
@@ -17,12 +18,8 @@ class _NovelReaderState extends State<NovelReader> {
   }
 
   void _loadChapter(int chapter) async {
-    if (_chapterData.containsKey(chapter)) {
-      // Already loaded
-      return;
-    }
+    if (_chapterData.containsKey(chapter)) return;
 
-    // Simulate async chapter fetch
     await Future.delayed(Duration(milliseconds: 300));
     _chapterData[chapter] =
         "Chapter $chapter\n\n" +
@@ -32,11 +29,12 @@ class _NovelReaderState extends State<NovelReader> {
         ).join("\n\n");
 
     setState(() {});
-    _scrollController.jumpTo(0); // Reset scroll position to top
+    _scrollController.jumpTo(0); // Reset scroll
   }
 
   void _goToNextChapter() {
     setState(() {
+      _slideUp = true;
       _currentChapter++;
       _loadChapter(_currentChapter);
     });
@@ -45,6 +43,7 @@ class _NovelReaderState extends State<NovelReader> {
   void _goToPreviousChapter() {
     if (_currentChapter > 1) {
       setState(() {
+        _slideUp = false;
         _currentChapter--;
         _loadChapter(_currentChapter);
       });
@@ -62,32 +61,56 @@ class _NovelReaderState extends State<NovelReader> {
           children: [
             content == null
                 ? Center(child: CircularProgressIndicator())
-                : Scrollbar(
-                    child: ListView(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 24,
-                      ),
-                      children: [
-                        if (_currentChapter > 1)
-                          FloatingActionButton(
-                            heroTag: 'prev',
-                            onPressed: _goToPreviousChapter,
-                            child: Icon(Icons.arrow_upward),
+                : AnimatedSwitcher(
+                    duration: Duration(milliseconds: 500),
+                    transitionBuilder: (child, animation) {
+                      final offsetAnimation = Tween<Offset>(
+                        begin: _slideUp ? Offset(0, 1) : Offset(0, -1),
+                        end: Offset.zero,
+                      ).animate(animation);
+                      return SlideTransition(
+                        position: offsetAnimation,
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      key: ValueKey<int>(_currentChapter),
+                      child: Scrollbar(
+                        child: ListView(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 24,
                           ),
-
-                        Text(
-                          content,
-                          style: TextStyle(fontSize: 18, height: 1.6),
+                          children: [
+                            if (_currentChapter > 1)
+                              Container(
+                                alignment: Alignment.center,
+                                height: 200,
+                                color: Colors.white38,
+                                child: FloatingActionButton(
+                                  heroTag: 'prev',
+                                  onPressed: _goToPreviousChapter,
+                                  child: Icon(Icons.arrow_upward),
+                                ),
+                              ),
+                            Text(
+                              content,
+                              style: TextStyle(fontSize: 18, height: 1.6),
+                            ),
+                            Container(
+                              alignment: Alignment.center,
+                              height: 200,
+                              color: Colors.white38,
+                              child: FloatingActionButton(
+                                heroTag: 'next',
+                                onPressed: _goToNextChapter,
+                                child: Icon(Icons.arrow_downward),
+                              ),
+                            ),
+                          ],
                         ),
-                        FloatingActionButton(
-                          heroTag: 'next',
-                          onPressed: _goToNextChapter,
-                          child: Icon(Icons.arrow_downward),
-                        ),
-                        SizedBox(height: 100), // Spacer at bottom
-                      ],
+                      ),
                     ),
                   ),
           ],
