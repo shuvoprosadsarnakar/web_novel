@@ -22,11 +22,10 @@ class _NovelReaderState extends State<NovelReader> {
   void _loadChapters() {
     for (int i = 0; i < 10; i++) {
       _chapterData[i] =
-          "Chapter ${i + 1}\n\n" +
-          List.generate(
+          "Chapter ${i + 1}\n\n${List.generate(
             50,
             (j) => "Line ${j + 1} of Chapter ${i + 1}",
-          ).join("\n\n");
+          ).join("\n\n")}";
     }
     setState(() {});
   }
